@@ -4,7 +4,7 @@ output: html_notebook
 ---
 
 ```{r}
-setwd("~/Downloads")
+
 library(readxl)
 library(RNHANES)
 library(tidyverse)
@@ -52,7 +52,7 @@ Participants’ age, gender, race, education, income/poverty ratio, and smoking 
 
 ```{r diet values}
 
-totd1 <- read.xport("Downloads/NHANES/PCA/DR1TOT_H.xpt")
+totd1 <- read.xport("Frailty/DR1TOT_H.xpt")
 
 #select variables from totd1
 totd1 <- select(totd1, SEQN,WTDRD1, WTDR2D, DR1DRSTZ, DRABF, DRDINT, DR1DAY, DR1TKCAL, DR1TPROT, DR1TCARB, DR1TSUGR,DR1TFIBE, DR1TTFAT ,DR1TSFAT, DR1TMFAT, DR1TPFAT , DR1TCHOL , DR1TATOC, DR1TATOA, DR1TVARA, DR1TBCAR, DR1TVB1, DR1TVB2, DR1TNIAC, DR1TVB6,  DR1TFA, DR1TVB12, DR1TB12A, DR1TVC, DR1TVD, DR1TVK, DR1TCALC, DR1TPHOS, DR1TMAGN, DR1TIRON , DR1TZINC, DR1TCOPP, DR1TSODI, DR1TPOTA, DR1TSELE, DR1TCAFF, DR1TALCO)
@@ -76,7 +76,7 @@ totd1 <- select(totd1,-c(vitE1,vitE2, vitBb12_1, vitB12_2))
 
 #same process for totd2
 
-totd2 <- read.xport("Downloads/NHANES/PCA/DR2TOT_H.xpt")
+totd2 <- read.xport("Frailty/DR2TOT_H.xpt")
 totd2 <- select(totd2, SEQN, DR2DRSTZ, DRDINT, DR2DAY, DR2TKCAL, DR2TPROT, DR2TCARB, DR2TSUGR,DR2TFIBE, DR2TTFAT ,DR2TSFAT, DR2TMFAT, DR2TPFAT , DR2TCHOL , DR2TATOC, DR2TATOA, DR2TVARA, DR2TBCAR, DR2TVB1, DR2TVB2, DR2TNIAC, DR2TVB6,  DR2TFA, DR2TVB12, DR2TB12A, DR2TVC, DR2TVD, DR2TVK, DR2TCALC, DR2TPHOS, DR2TMAGN, DR2TIRON , DR2TZINC, DR2TCOPP, DR2TSODI, DR2TPOTA, DR2TSELE, DR2TCAFF, DR2TALCO)
 
 colnames(totd2) <- c("rsp_num", "Dietary2 recall status", "Number of days of intake2", "Intake day of the week2", "Energy2", "Protein2","Carbs2","TotSugar2", "fiber2", "Tot_fat2","Sat_fat2","mfat2","pfat2","chol2","vitE1_2","vitE2_2","vitA2", "beta_carotene2","vitB1_2","vitB2_2","niacin_2","vitB6_2",  "folic_acid2","vitBb12_1_2", "vitB12_2_2", "vitC2", "vitD2", "vitK2", "calcium2", "phosphorous2",  "magnesium2", "iron2", "zinc2", "copper2", "sodium2", "potassium2", "selenium2", "caffeine2", "alcohol2")
@@ -115,20 +115,20 @@ head(totd)
 
 ```{r diet values round 2}
 #Demographics + names wanted
-demo <- read.xport("Downloads/NHANES/DataFiles/Frailty/DEMO_H.xpt")
+demo <- read.xport("Frailty/DEMO_H.xpt")
 demo <- select(demo, SEQN, SDDSRVYR, RIAGENDR, RIDAGEYR, RIDRETH3, DMDEDUC2, RIDEXPRG, WTINT2YR, WTMEC2YR, SDMVPSU, SDMVSTRA, INDFMPIR)
 colnames(demo) <- c("rsp_num", "data_cycle", "gender", "age", "race", "education", "pregnant", "int_weight", "mec_weight", "msk_var_psu", "msk_var_strat", "incpov_ratio" )
 
 
 ##smoking status
-smok <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/SMQ_H.xpt")
+smok <- read.xport("Frailty/SMQ_H.xpt")
 smok <- smok[,c(1,4)]
 colnames(smok) <- c("rsp_num", "curr_smok")
 smok <- mutate(smok, smoker = case_when(curr_smok == "1" | curr_smok == "2" ~ 1, TRUE ~ 0)) 
 demo <- merge(smok[,c(1,3)], demo, by = "rsp_num")
 
 ##Smell and taste questionnaire time
-stq <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/CSQ_H.xpt")
+stq <- read.xport("Frailty/CSQ_H.xpt")
 stq <- select(stq, SEQN, CSQ010, CSQ020, CSQ040, CSQ080, CSQ100, CSQ110, CSQ200, CSQ202, CSQ204, CSQ240, CSQ250, CSQ260)
 colnames(stq) <- c("rsp_num", "prb_sm12", "ch_sm25", "phant_odor", "prb_ts12", "ch_ts_flv", "pers_ts12", "pers_cld_flu12", "pers_drym", "freq_nas_cong", "head_inj", "face_inj", "sin_inf")
 stq <- mutate(stq, sr_od = case_when(prb_sm12 == "1" | ch_sm25 == "2" | phant_odor == "1" ~ 1, TRUE ~ 0)) 
@@ -178,7 +178,7 @@ comb$sin_inf[comb$sin_inf == "9"] <- NA
 comb$sin_inf[comb$sin_inf == "1"] <- 1 ; comb$sin_inf[comb$sin_inf == "2"] <- 0  
 comb$education[comb$education == "9"] <- NA 
 
-ste <- read.xport("Downloads/NHANES/DataFiles/Frailty/CSX_H.xpt")
+ste <- read.xport("Frailty/CSX_H.xpt")
 stenames <- c("rsp_num","tse_status", "tse_comcode", "quin_allg", "preg_breast", "sneeze", "discol_mucus", "nasal_block", "sinus_pain", "runny_nose", "none_above", "type_nblock", "lowint_light", "highint_light", "med_light", "low_light", "high_light", "tt1_quin", "tt1_quin_taste", "tt1_1nacl", "tt1_1nacl_taste", "wmt_quin", "wmt_quin_taste", "wmt_1nacl", "wmt_1nacl_taste", "wmt_32nacl", "wmt_32nacl_taste", "wmt_seq", "sm_choc", "sm_straw", "sm_smonk", "sm_leath", "sm_soap", "sm_grape", "sm_onion", "sm_natgas", "wmr_1nacl", "wmr_1nacl_taste", "wmr_32nacl", "wmr_32nacl_taste", "understand")
 colnames(ste) <- stenames
 ste <- filter(ste, tse_status != "3")
@@ -207,52 +207,52 @@ comb <- mutate(comb, obj_gd = case_when(obj_gd_quin == "1" | obj_gd_32nacl == "1
 
 ```{r FI}
 ###Building frailty index
-mcon1314 <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/MCQ_H.xpt")
+mcon1314 <- read.xport("Frailty/MCQ_H.xpt")
 mcon1314 <- select(mcon1314, SEQN, MCQ160F, MCQ160M,  MCQ220, MCQ160E, MCQ160C, MCQ160D, MCQ160A)
 colnames(mcon1314) <- c("rsp_num", "stroke", "thyr_ever", "cancer", "hrt_atck", "cor_hrt_dis", "angina", "arthritis")
-dis1314 <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/DLQ_H.xpt")
+dis1314 <- read.xport("Frailty/DLQ_H.xpt")
 dis1314 <- select(dis1314, SEQN, DLQ020)
 colnames(dis1314) <- c("rsp_num", "seeing") 
 mcon <- merge(dis1314, mcon1314, by = "rsp_num")
 
-diab <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/DIQ_H.xpt")
+diab <- read.xport("Frailty/DIQ_H.xpt")
 diab <- select(diab, SEQN, DIQ010)
 colnames(diab) <- c("rsp_num", "diabetes")
 
 
-kid <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/KIQ_U_H.xpt")
+kid <- read.xport("Frailty/KIQ_U_H.xpt")
 kid <- select(kid, SEQN, KIQ022, KIQ042, KIQ044, KIQ046)
 colnames(kid) <- c("rsp_num", "weak_fail_kid", "leak_phys", "leak_reach", "leak_nonphys")
 kid <- mutate(kid, leak = case_when( leak_reach == "1" | leak_nonphys == "1" ~ 1, leak_reach == "2" & leak_nonphys == "2" ~ 2))
 kid <- select(kid, rsp_num, weak_fail_kid, leak)
 
-pfunc <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/PFQ_H.xpt")
+pfunc <- read.xport("Frailty/PFQ_H.xpt")
 pfunc <- select(pfunc, SEQN, PFQ061K, PFQ061L, PFQ061J, PFQ061I, PFQ061A, PFQ061G, PFQ061M, PFQ061D, PFQ061P, PFQ061E, PFQ061T, PFQ061R, PFQ057)
 colnames(pfunc) <- c("rsp_num", "diff_fork", "diff_dress", "diff_bed", "diff_chair", "diff_money", "diff_meals", "diff_standing", "diff_stoop", "diff_grasp", "diff_lift", "diff_pushp", "diff_social", "diff_rememb")
 
-bp <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/BPX_H.xpt")
+bp <- read.xport("Frailty/BPX_H.xpt")
 bp <- select(bp, SEQN, BPXPLS, BPXSY1, BPXSY2, BPXSY3)
 colnames(bp) <- c("rsp_num", "rest_hr", "sys_bp1", "sys_bp2", "sys_bp3")
 bp <- mutate(bp, sys_bp = rowMeans(bp[,3:5]))
 bp <- select(bp, rsp_num, rest_hr, sys_bp)
 
-aud <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/DLQ_H.xpt")
+aud <- read.xport("Frailty/DLQ_H.xpt")
 aud <- select(aud, SEQN, DLQ010)
 colnames(aud) <- c("rsp_num", "diff_hear")
 
-fol <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/FOLFMS_H.xpt")
+fol <- read.xport("Frailty/FOLFMS_H.xpt")
 fol <- select(fol, SEQN, LBDFOT)
 colnames(fol) <- c("rsp_num", "folate")
 
-ghb <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/GHB_H.xpt") 
+ghb <- read.xport("Frailty/GHB_H.xpt") 
 ghb <- select(ghb, SEQN, LBXGH)
 colnames(ghb) <- c("rsp_num", "hba1c")
 
-cblood <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/CBC_H.xpt") 
+cblood <- read.xport("Frailty/CBC_H.xpt") 
 cblood <- select(cblood, SEQN, LBXRBCSI, LBXHGB, LBXRDW, LBXLYPCT, LBXNEPCT)
 colnames(cblood) <- c("rsp_num", "rbc_count", "hb", "RDW", "lymphocyte", "seg_neut")
 
-meds <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/RXQ_RX_H.xpt")
+meds <- read.xport("Frailty/RXQ_RX_H.xpt")
 meds <- select(meds, SEQN, RXDCOUNT, RXDUSE)
 meds <- distinct(meds) ##SEQN isnt a unique identifier for this dataset
 meds <- mutate(meds, medication = case_when(RXDUSE == "2" ~ 0, RXDCOUNT == "1" ~ 1, RXDCOUNT == "2" ~ 2, RXDCOUNT == "3" ~ 3, RXDCOUNT == "4" ~ 4, RXDCOUNT == "5" ~ 5, RXDCOUNT == "6" ~ 6, RXDCOUNT == "7" ~ 7, RXDCOUNT == "8" ~ 8, RXDCOUNT == "9" ~ 9, RXDCOUNT == "10" ~ 10, RXDCOUNT == "11" ~ 11, RXDCOUNT == "12" ~ 12, RXDCOUNT == "13" ~ 13, RXDCOUNT == "14" ~ 14, RXDCOUNT == "15" ~ 15, RXDCOUNT == "16" ~ 16, RXDCOUNT == "17" ~ 17, RXDCOUNT == "18" ~ 18, RXDCOUNT == "19" ~ 19, RXDCOUNT == "20" ~ 20, RXDCOUNT == "23" ~ 23 ))
@@ -260,11 +260,11 @@ meds <- select(meds, SEQN, medication)
 colnames(meds) <- c("rsp_num", "medication")
 meds$medication <- case_when(meds$medication < 5 ~ 0, meds$medication >= 5 ~ 1) #Vicinanza 2018 defines polypharmacy as 5 or more medications
 
-care <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/HUQ_H.xpt")
+care <- read.xport("Frailty/HUQ_H.xpt")
 care <- select(care, SEQN, HUQ010, HUQ020, HUQ071)
 colnames(care) <- c("rsp_num", "sr_health", "year_health", "overnight_stays")
 
-osteo <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/OSQ_H.xpt")
+osteo <- read.xport("Frailty/OSQ_H.xpt")
 osteo <- select(osteo, SEQN, OSQ060)
 colnames(osteo) <- c("rsp_num", "ost_brittle")
 
@@ -381,10 +381,7 @@ troo <- mutate(as.data.frame(troo), notna = rowSums(troo))
 index <- mutate(index, fraildex = (rowSums(index[,c(4:42)], na.rm = T))/troo$notna)
 index <- mutate(index, missing = (rowSums(is.na(index[,c(4:42)]))/39) * 100)
 
-```
 
-
-```{r}
 comb <- merge(index[,c(1,43,44)], comb, by = "rsp_num")
 comb <- mutate(comb, fraildex_cat = case_when(fraildex <= 0.1 ~ 1, fraildex > 0.1 & fraildex <= 0.21 ~ 2, fraildex > 0.21 & fraildex <= 0.45 ~ 3, fraildex > 0.45 ~ 4)) 
 comb$fraildex_cat <- factor(comb$fraildex_cat)
@@ -395,7 +392,7 @@ comb$fraildex_cat <- factor(comb$fraildex_cat)
 #add diet
 comb <- merge(totd,comb,by = "rsp_num")
 
-bmi <- read.xport("Downloads/NHANES/DataFiles/Frailty/BMX_H.xpt")
+bmi <- read.xport("Frailty/BMX_H.xpt")
 head(bmi)
 bmi <- select(bmi, SEQN, BMXBMI)
 colnames(bmi) <- c("rsp_num","bmi")
@@ -427,9 +424,9 @@ for (i in c(2:31)){
 }
 
 
-diet_pca <- diet
-diet_pca[11:41] <-adjust
-diet_pca
+
+adjust
+
 ```
 
 ```{r}

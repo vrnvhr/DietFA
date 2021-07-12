@@ -49,6 +49,53 @@ Participants’ age, gender, race, education, income/poverty ratio, and smoking 
 
 
 
+``` {r Function that takes results from glm and makes a table with relevant info} 
+
+glm_table_maker <- function(glm_results,i){
+  
+glm_summary <- summary(glm_results)[i]$coefficients
+
+
+clnm <- colnames(glm_summary)
+rwnm <- rownames(glm_summary) 
+nrows = length(rwnm)
+glm_table = data.frame((matrix(NA, nrows-1, ncol = 4)))
+
+colnames(glm_table) <- c(clnm)
+
+rownames(glm_table) <- gsub("`", "",rownames(glm_summary)[2:nrows], ignore.case = TRUE)
+tb_rwnms <- rownames(glm_table)
+#print(tb_rwnms)
+
+index = 1
+for (x in tb_rwnms){
+  print(x)
+  y = nchar(x)
+  print(y)
+  if(substring(x,y,y) == "1"){
+    tb_rwnms[index] = substring(x,1,y-1)
+  }
+  index =index + 1
+}
+
+rownames(glm_table) <- tb_rwnms
+#print(tb_rwnms)
+glm_table
+
+for (i in 2:nrows ){
+      for (j in 1:4){
+        if(j==4 && glm_summary[i,j] < 0.05)
+        glm_table[i-1,j] = paste(formatC(glm_summary[i,j],digits = 3),"*",sep = "")
+        else
+        glm_table[i-1,j] = formatC(glm_summary[i,j],digits = 3)
+      }
+  
+}
+return(glm_table)
+}
+```
+
+
 
 ```{r diet values}
 
@@ -176,6 +223,9 @@ comb$face_inj[comb$face_inj == "9"] <- NA
 comb$face_inj[comb$face_inj == "1"] <- 1 ; comb$face_inj[comb$face_inj == "2"] <- 0  
 comb$sin_inf[comb$sin_inf == "9"] <- NA 
 comb$sin_inf[comb$sin_inf == "1"] <- 1 ; comb$sin_inf[comb$sin_inf == "2"] <- 0  
+
+
+
 comb$education[comb$education == "9"] <- NA 
 
 ste <- read.xport("Frailty/CSX_H.xpt")
@@ -368,6 +418,7 @@ index$seg_neut <-  with (index, case_when(seg_neut >= 40 & seg_neut <= 70 ~ 0, T
 
 
 comb$gender[comb$gender == "1"] <- 0;comb$gender[comb$gender == "2"] <- 1
+
 ```
 
 
@@ -536,6 +587,8 @@ diet$fraildex_cat <- as.factor(diet$fraildex_cat)
 diet$fraildex <- as.numeric(diet$fraildex)
 
 
+#add history of nasal issues
+diet<- mutate(diet, his_sd = case_when(pers_cld_flu12 == "1" | freq_nas_cong == "1" | head_inj == "1"|sin_inf == "1" ~ 1, TRUE ~ 0))
 
 ```
 
@@ -582,50 +635,301 @@ svyscores.a <- (fooz %*% svyload.a)
 #svyscores <- (X %*% solve(cor(X)) %*% svyloadings)
 
 
+#unadjusted survey scores
+diet$ua.dp1 <- as.numeric(svyscores.ua[,1])
+diet$ua.dp2 <- as.numeric(svyscores.ua[,2])
+diet$ua.dp3 <- as.numeric(svyscores.ua[,3])
+diet$ua.dp4 <- as.numeric(svyscores.ua[,4])
 
-svdp1 <- svyscores[,1];svdp2 <- svyscores[,2];svdp3 <- svyscores[,3];svdp4 <- svyscores[,4]
-#svdp5 <- svyscores[,5];svdp6 <- svyscores[,6];svdp7 <- svyscores[,7]
+#adjusted survey scores
 
+diet$a.dp1 <- as.numeric(svyscores.a[,1])
+diet$a.dp2 <- as.numeric(svyscores.a[,2])
+diet$a.dp3 <- as.numeric(svyscores.a[,3])
+diet$a.dp4 <- as.numeric(svyscores.a[,4])
 
-diet$svdp1 <- as.numeric(svdp1)
-diet$svdp1
-diet$svdp2<- as.numeric(svdp2)
-diet$svdp3 <- as.numeric(svdp3)
-diet$svdp4 <- as.numeric(svdp4)
-
+diet$age <- as.ordered(diet$age)
 
 ```
 
 
-```{r Quantile svdp}
+```{r Quantiles for both scores}
+
+#unadjusted quantiles
+
+quantile.ua1 <- as.factor(ntile(diet$ua.dp1, 4))
+levels(quantile.ua1) = c("lowest", "2nd quant", "3rd quant", "highest")
+diet$quantile.ua1 <- quantile.ua1
+
+quantile.ua2 <- as.factor(ntile(diet$ua.dp2, 4))
+levels(quantile.ua2) = c("lowest", "2nd quant", "3rd quant", "highest")
+diet$quantile.ua2 <- quantile.ua2
+
+quantile.ua3 <- as.factor(ntile(diet$ua.dp3, 4))
+levels(quantile.ua3) = c("lowest", "2nd quant", "3rd quant", "highest")
+diet$quantile.ua3 <- quantile.ua3
+
+quantile.ua4 <- as.factor(ntile(diet$ua.dp4, 4))
+levels(quantile.ua4) = c("lowest", "2nd quant", "3rd quant", "highest")
+diet$quantile.ua4 <- quantile.ua4
+
+#adjusted quantiles
+
+quantile.a1 <- as.factor(ntile(diet$a.dp1, 4))
+levels(quantile.a1) = c("lowest", "2nd quant", "3rd quant", "highest")
+diet$quantile.a1 <- quantile.a1
+
+quantile.a2 <- as.factor(ntile(diet$a.dp2, 4))
+levels(quantile.a2) = c("lowest", "2nd quant", "3rd quant", "highest")
+diet$quantile.a2 <- quantile.a2
+
+quantile.a3 <- as.factor(ntile(diet$a.dp3, 4))
+levels(quantile.a3) = c("lowest", "2nd quant", "3rd quant", "highest")
+diet$quantile.a3 <- quantile.a3
+
+quantile.a4 <- as.factor(ntile(diet$a.dp4, 4))
+levels(quantile.a4) = c("lowest", "2nd quant", "3rd quant", "highest")
+diet$quantile.a4 <- quantile.a4
 
 
-diet$quantile <- as.factor((quantile = ntile(diet$svdp2, 4)))
-#levels(diet$quantile) <- c("greatest risk", "2nd quant", "3rd quant", "4th quant", "5th quant")
-levels(diet$quantile) <- c("greatest risk", "2nd quant", "3rd quant", "least risk")
 
 #diet$quantile <- relevel(diet$quantile, ref = "4th quant")
 
 #diet <- within(diet, quantile <- relevel(quantile, ref = "least risk" ))
+
+#levels(diet$quantile) <- c("greatest risk", "2nd quant", "3rd quant", "4th quant", "5th quant")
 ```
 
 
-```{r Survery design with quantile}
+```{r Survery design for regressions}
+#survey design object for analysis and regressions
+#weights used are int_weight
 diet_sur <- svydesign(id = ~msk_var_psu, strata = ~msk_var_strat, weights = ~int_weight, nest = TRUE, data = diet)
-dsub1 <- subset(diet_sur,(diet$age == 3 |diet$age == 4|diet$age == 5))
-dsub2 <- subset(diet_sur,diet$sr_od == 0)
+
+
+#subset of older > 60
+dsub1 <- subset(diet_sur,(diet$ageNum <= 60) & (diet$gender == 0))
+dsub2 <- subset(diet_sur,(diet$ageNum <= 60) & (diet$gender == 1))
+dsub3 <- subset(diet_sur,(diet$ageNum > 60) & (diet$gender == 0))
+dsub4 <- subset(diet_sur,(diet$ageNum > 60) & (diet$gender == 1))
+
+#subset excluding sr_od
+dsub5 <- subset(diet_sur, (diet$ageNum > 45) & (diet$sr_od == 0))
+```
 
 
 
-newfit <- summary((svyglm(obj_od ~ quantile + gender + race + bmi + smoker , design = dsub2, family = "quasibinomial")))
+
+
+Unadjusted Log Fits
 
 
 
 
-cbind(exp(confint(newfit)),exp(coefficients(newfit)),newfit.summary$coefficients[,4])
+```{r Regression fits for unadjusted: young males}
+
+#unadjusted dps by quantile and obj_od
+ua.ym.fit1<- summary(svyglm(obj_od ~ quantile.ua1 + race + bmi + smoker + incpov_ratio, design = dsub1, family = "quasibinomial"))
+
+ua.ym.fit2<- summary(svyglm(obj_od ~ quantile.ua2  + race + bmi + smoker + incpov_ratio, design = dsub1, family = "quasibinomial"))
+
+ua.ym.fit3<- summary(svyglm(obj_od ~ quantile.ua3 + race + bmi + smoker + incpov_ratio, design = dsub1, family = "quasibinomial"))
+
+ua.ym.fit4<- summary(svyglm(obj_od ~ quantile.ua4 + race + bmi + smoker + incpov_ratio , design = dsub1, family = "quasibinomial"))
+
+
+
+rez.ym <-rbind(ua.ym.fit1$coefficients[1:4,],ua.ym.fit2$coefficients[1:4,],ua.ym.fit3$coefficients[1:4,],ua.ym.fit4$coefficients[1:4,])
+
+rez.ym<- sapply(rez.ym[,4], function(x){if (x < 0.05) x <- paste(x,"*",sep = "")})
+
+for(i in c(1:length(rez.ym))){
+  if (!is.null(rez.ym[[i]]))
+    print(rez.ym[i])
+}
 
 
 ```
+
+```{r Regression fits for unadjusted: young females}
+
+#unadjusted dps by quantile and obj_od
+ua.yf.fit1<- summary(svyglm(obj_od ~ quantile.ua1  + race + bmi + smoker + incpov_ratio, design = dsub2, family = "quasibinomial"))
+
+ua.yf.fit2<- summary(svyglm(obj_od ~ quantile.ua2  + race + bmi + smoker + incpov_ratio, design = dsub2, family = "quasibinomial"))
+
+ua.yf.fit3<- summary(svyglm(obj_od ~ quantile.ua3  + race + bmi + smoker + incpov_ratio, design = dsub2, family = "quasibinomial"))
+
+ua.yf.fit4<- summary(svyglm(obj_od ~ quantile.ua4 + race + bmi + smoker + incpov_ratio , design = dsub2, family = "quasibinomial"))
+
+#display significant
+
+rez.yf <-rbind(ua.yf.fit1$coefficients[1:4,],ua.yf.fit2$coefficients[1:4,],ua.yf.fit3$coefficients[1:4,],ua.yf.fit4$coefficients[1:4,])
+
+rez.yf<- sapply(rez.yf[,4], function(x){if (x < 0.05) x <- paste(x,"*",sep = "")})
+
+for(i in c(1:length(rez.yf))){
+  if (!is.null(rez.yf[[i]]))
+    print(rez.yf[i])
+}
+
+
+```
+
+```{r Regression fits for unadjusted: old males}
+#unadjusted dps by quantile and obj_od
+ua.om.fit1<- summary(svyglm(obj_od ~ quantile.ua1  + race + bmi + smoker + incpov_ratio, design = dsub3, family = "quasibinomial"))
+
+ua.om.fit2<- summary(svyglm(obj_od ~ quantile.ua2  + race + bmi + smoker + incpov_ratio, design = dsub3, family = "quasibinomial"))
+
+ua.om.fit3<- summary(svyglm(obj_od ~ quantile.ua3  + race + bmi + smoker + incpov_ratio, design = dsub3, family = "quasibinomial"))
+
+ua.om.fit4<- summary(svyglm(obj_od ~ quantile.ua4 + race + bmi + smoker + incpov_ratio , design = dsub3, family = "quasibinomial"))
+
+#display significant
+
+rez.om <-rbind(ua.om.fit1$coefficients[1:4,],ua.om.fit2$coefficients[1:4,],ua.om.fit3$coefficients[1:4,],ua.om.fit4$coefficients[1:4,])
+
+rez.om<- sapply(rez.om[,4], function(x){if (x < 0.05) x <- paste(x,"*",sep = "")})
+
+for(i in c(1:length(rez.om))){
+  if (!is.null(rez.om[[i]]))
+    print(rez.om[i])
+}
+
+```
+
+
+```{r log reg for old females}
+#unadjusted dps by quantile and obj_od
+ua.of.fit1<- summary(svyglm(obj_od ~ quantile.ua1  + race + bmi + smoker + incpov_ratio, design = dsub4, family = "quasibinomial"))
+
+ua.of.fit2<- summary(svyglm(obj_od ~ quantile.ua2  + race + bmi + smoker + incpov_ratio, design = dsub4, family = "quasibinomial"))
+
+ua.of.fit3<- summary(svyglm(obj_od ~ quantile.ua3  + race + bmi + smoker + incpov_ratio, design = dsub4, family = "quasibinomial"))
+
+ua.of.fit4<- summary(svyglm(obj_od ~ quantile.ua4 + race + bmi + smoker + incpov_ratio , design = dsub4, family = "quasibinomial"))
+
+#display significant
+
+rez.of <-rbind(ua.of.fit1$coefficients[1:4,],ua.of.fit2$coefficients[1:4,],ua.of.fit3$coefficients[1:4,],ua.of.fit4$coefficients[1:4,])
+
+rez.of<- sapply(rez.of[,4], function(x){if (x < 0.05) x <- paste(x,"*",sep = "")})
+
+for(i in c(1:length(rez.of))){
+  if (!is.null(rez.of[[i]]))
+    print(rez.of[i])
+}
+```
+
+
+
+
+
+
+Adjusted Log. Fits
+
+
+
+
+
+```{r Regression fits for unadjusted: young males}
+
+#unadjusted dps by quantile and obj_od
+ua.ym.fit1<- summary(svyglm(obj_od ~ quantile.ua1 + race + bmi + smoker + incpov_ratio, design = dsub1, family = "quasibinomial"))
+
+ua.ym.fit2<- summary(svyglm(obj_od ~ quantile.ua2  + race + bmi + smoker + incpov_ratio, design = dsub1, family = "quasibinomial"))
+
+ua.ym.fit3<- summary(svyglm(obj_od ~ quantile.ua3 + race + bmi + smoker + incpov_ratio, design = dsub1, family = "quasibinomial"))
+
+ua.ym.fit4<- summary(svyglm(obj_od ~ quantile.ua4 + race + bmi + smoker + incpov_ratio , design = dsub1, family = "quasibinomial"))
+
+
+
+rez.ym <-rbind(ua.ym.fit1$coefficients[1:4,],ua.ym.fit2$coefficients[1:4,],ua.ym.fit3$coefficients[1:4,],ua.ym.fit4$coefficients[1:4,])
+
+rez.ym<- sapply(rez.ym[,4], function(x){if (x < 0.05) x <- paste(x,"*",sep = "")})
+
+for(i in c(1:length(rez.ym))){
+  if (!is.null(rez.ym[[i]]))
+    print(rez.ym[i])
+}
+
+
+```
+
+```{r Regression fits for unadjusted: young females}
+
+#unadjusted dps by quantile and obj_od
+ua.yf.fit1<- summary(svyglm(obj_od ~ quantile.ua1  + race + bmi + smoker + incpov_ratio, design = dsub2, family = "quasibinomial"))
+
+ua.yf.fit2<- summary(svyglm(obj_od ~ quantile.ua2  + race + bmi + smoker + incpov_ratio, design = dsub2, family = "quasibinomial"))
+
+ua.yf.fit3<- summary(svyglm(obj_od ~ quantile.ua3  + race + bmi + smoker + incpov_ratio, design = dsub2, family = "quasibinomial"))
+
+ua.yf.fit4<- summary(svyglm(obj_od ~ quantile.ua4 + race + bmi + smoker + incpov_ratio , design = dsub2, family = "quasibinomial"))
+
+#display significant
+
+rez.yf <-rbind(ua.yf.fit1$coefficients[1:4,],ua.yf.fit2$coefficients[1:4,],ua.yf.fit3$coefficients[1:4,],ua.yf.fit4$coefficients[1:4,])
+
+rez.yf<- sapply(rez.yf[,4], function(x){if (x < 0.05) x <- paste(x,"*",sep = "")})
+
+for(i in c(1:length(rez.yf))){
+  if (!is.null(rez.yf[[i]]))
+    print(rez.yf[i])
+}
+
+
+```
+
+```{r Regression fits for unadjusted: old males}
+#unadjusted dps by quantile and obj_od
+ua.om.fit1<- summary(svyglm(obj_od ~ quantile.ua1  + race + bmi + smoker + incpov_ratio, design = dsub3, family = "quasibinomial"))
+
+ua.om.fit2<- summary(svyglm(obj_od ~ quantile.ua2  + race + bmi + smoker + incpov_ratio, design = dsub3, family = "quasibinomial"))
+
+ua.om.fit3<- summary(svyglm(obj_od ~ quantile.ua3  + race + bmi + smoker + incpov_ratio, design = dsub3, family = "quasibinomial"))
+
+ua.om.fit4<- summary(svyglm(obj_od ~ quantile.ua4 + race + bmi + smoker + incpov_ratio , design = dsub3, family = "quasibinomial"))
+
+#display significant
+
+rez.om <-rbind(ua.om.fit1$coefficients[1:4,],ua.om.fit2$coefficients[1:4,],ua.om.fit3$coefficients[1:4,],ua.om.fit4$coefficients[1:4,])
+
+rez.om<- sapply(rez.om[,4], function(x){if (x < 0.05) x <- paste(x,"*",sep = "")})
+
+for(i in c(1:length(rez.om))){
+  if (!is.null(rez.om[[i]]))
+    print(rez.om[i])
+}
+
+```
+
+
+```{r log reg for old females}
+#unadjusted dps by quantile and obj_od
+ua.of.fit1<- summary(svyglm(obj_od ~ quantile.ua1  + race + bmi + smoker + incpov_ratio, design = dsub4, family = "quasibinomial"))
+
+ua.of.fit2<- summary(svyglm(obj_od ~ quantile.ua2  + race + bmi + smoker + incpov_ratio, design = dsub4, family = "quasibinomial"))
+
+ua.of.fit3<- summary(svyglm(obj_od ~ quantile.ua3  + race + bmi + smoker + incpov_ratio, design = dsub4, family = "quasibinomial"))
+
+ua.of.fit4<- summary(svyglm(obj_od ~ quantile.ua4 + race + bmi + smoker + incpov_ratio , design = dsub4, family = "quasibinomial"))
+
+#display significant
+
+rez.of <-rbind(ua.of.fit1$coefficients[1:4,],ua.of.fit2$coefficients[1:4,],ua.of.fit3$coefficients[1:4,],ua.of.fit4$coefficients[1:4,])
+
+rez.of<- sapply(rez.of[,4], function(x){if (x < 0.05) x <- paste(x,"*",sep = "")})
+
+for(i in c(1:length(rez.of))){
+  if (!is.null(rez.of[[i]]))
+    print(rez.of[i])
+}
+```
+
+
 
 
 ```{r Survery design2}
@@ -654,16 +958,16 @@ summary(model.linear)
 
 
     
-    fit1 <- (svyglm(obj_od ~ svdp1 + gender  + Energy + incpov_ratio + smoker + race + bmi, design = dsub1, family = "quasibinomial"))
+    fit1 <- (svyglm(obj_od ~ ua.dp1 + incpov_ratio + smoker + race + bmi, design = dsub4, family = "quasibinomial"))
     g1 <- glm_table_maker(fit1, 13)[1,]
     
-    fit2 <- (svyglm(obj_od ~ svdp2 + gender + Energy + incpov_ratio + smoker + race , design = dsub1, family = "quasibinomial"))
+    fit2 <- (svyglm(obj_od ~ ua.dp2 + incpov_ratio + smoker + race , design = dsub4, family = "quasibinomial"))
       g2 <- glm_table_maker(fit2, 13)[1,]
     
-    fit3 <- (svyglm(obj_od ~ svdp3 + gender + Energy + incpov_ratio + smoker + race + bmi, design = dsub1, family = "quasibinomial"))
+    fit3 <- (svyglm(obj_od ~ ua.dp3 + + incpov_ratio + smoker + race + bmi, design = dsub4, family = "quasibinomial"))
     g3 <- glm_table_maker(fit3, 13)[1,]
     
-    fit3 <- (svyglm(obj_od ~ svdp4 + gender+ Energy  + incpov_ratio + smoker + race + bmi, design = dsub1, family = "quasibinomial"))
+    fit3 <- (svyglm(obj_od ~ ua.dp4 +  + incpov_ratio + smoker + race + bmi, design = dsub4, family = "quasibinomial"))
     g4 <- glm_table_maker(fit3, 13)[1,]
     
 
@@ -712,27 +1016,7 @@ resultsOD
 
 
 
-```{r Age-stratified survey weighted factanal logistic regressions frailty}
-resultsFr = data.frame()
 
-
-for (i in c(1:length(dsgs))){
-
-    dsg <- dsgs[[i]]
-    
-    fit1 <- (svyglm(fraildex ~ svdp1 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dsg, family = "gaussian"))
-    
-    fit2 <- (svyglm(fraildex ~ svdp2 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dsg, family = "gaussian"))
-    
-    fit3 <- (svyglm(fraildex ~ svdp3 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dsg, family = "gaussian"))
-    
-    fit4 <- (svyglm(fraildex ~ svdp4 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dsg, family = "gaussian"))
-    
-    resultsFr <- rbind(resultsFr,dsg_names[[i]],glm_table_maker(fit1, 13)[1,],glm_table_maker(fit2, 13)[1,],glm_table_maker(fit3, 13)[1,],glm_table_maker(fit4, 13)[1,])
-
-}
-
-resultsFr#dp2 is signficant for older mOD
 ```
 
 
