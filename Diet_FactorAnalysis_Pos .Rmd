@@ -1,0 +1,958 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+setwd("~/Downloads")
+library(readxl)
+library(RNHANES)
+library(tidyverse)
+library(dplyr)
+library(devtools)
+library(SASxport)
+
+
+
+library(factoextra)
+library(psych)
+library(corrplot)
+library(ggplot2)
+
+library(survey)
+
+library(nFactors)
+
+library(broom.helpers)
+library(forestmodel)
+library(ggplot2)
+library(ggstance)
+library(ggpubr)
+library(mice)
+library(VIM)
+
+
+library(geometry)
+
+```
+Covariates:
+
+Participants’ age, gender, race, education, income/poverty ratio, and smoking status
+
+1. total calories, total fat, saturated fat, monounsaturated fat, polyunsaturated fat, omega-3 fatty acids, omega-6 fatty acids, protein, carbohydrate, fiber, alcohol, cholesterol, niacin, thiamin, vitamin A, vitamin B2, vitamin B6, vitamin B12, vitamin C, vitamin D, vitamin E, iron, magnesium, selenium, zinc, folic acid, β carotene, and caffeine, omega-3 fatty acids, omega-6 fatty acids
+
+2. n3 fatty acid contained linolenic acid (18:3), stearidonic acid (18:4), eicosatetraenoic acid (20:5), clupanodonic acid (22:5), and docosahexaenoic acid (22:6)
+    n6 fatty acid contained linoleic acid (18:2) and arachidonic acid (20:4)
+
+
+
+
+
+
+
+```{r diet values}
+
+totd1 <- read.xport("Downloads/NHANES/PCA/DR1TOT_H.xpt")
+
+#select variables from totd1
+totd1 <- select(totd1, SEQN,WTDRD1, WTDR2D, DR1DRSTZ, DRABF, DRDINT, DR1DAY, DR1TKCAL, DR1TPROT, DR1TCARB, DR1TSUGR,DR1TFIBE, DR1TTFAT ,DR1TSFAT, DR1TMFAT, DR1TPFAT , DR1TCHOL , DR1TATOC, DR1TATOA, DR1TVARA, DR1TBCAR, DR1TVB1, DR1TVB2, DR1TNIAC, DR1TVB6,  DR1TFA, DR1TVB12, DR1TB12A, DR1TVC, DR1TVD, DR1TVK, DR1TCALC, DR1TPHOS, DR1TMAGN, DR1TIRON , DR1TZINC, DR1TCOPP, DR1TSODI, DR1TPOTA, DR1TSELE, DR1TCAFF, DR1TALCO)
+
+#name them
+colnames(totd1) <- c("rsp_num", "D1Weight", "D2Weight", "Dietary recall status", "Breast-fed infant (either day)", "Number of days of intake", "Intake day of the week", "Energy", "Protein","Carbs","TotSugar", "fiber", "Tot_fat","Sat_fat","mfat","pfat","chol","vitE1","vitE2","vitA", "beta_carotene","vitB1","vitB2","niacin","vitB6",  "folic_acid","vitBb12_1", "vitB12_2", "vitC", "vitD", "vitK", "calcium", "phosphorous",  "magnesium", "iron", "zinc", "copper", "sodium", "potassium", "selenium", "caffeine", "alcohol")
+
+#combine vite E1 + vitE2
+totd1$vitE <- totd1$vitE1+totd1$vitE2
+
+#combine vitB12
+
+totd1$B12 <- totd1$vitBb12_1 + totd1$vitB12_2
+
+#delete original columns
+totd1 <- select(totd1,-c(vitE1,vitE2, vitBb12_1, vitB12_2))
+
+
+
+
+
+#same process for totd2
+
+totd2 <- read.xport("Downloads/NHANES/PCA/DR2TOT_H.xpt")
+totd2 <- select(totd2, SEQN, DR2DRSTZ, DRDINT, DR2DAY, DR2TKCAL, DR2TPROT, DR2TCARB, DR2TSUGR,DR2TFIBE, DR2TTFAT ,DR2TSFAT, DR2TMFAT, DR2TPFAT , DR2TCHOL , DR2TATOC, DR2TATOA, DR2TVARA, DR2TBCAR, DR2TVB1, DR2TVB2, DR2TNIAC, DR2TVB6,  DR2TFA, DR2TVB12, DR2TB12A, DR2TVC, DR2TVD, DR2TVK, DR2TCALC, DR2TPHOS, DR2TMAGN, DR2TIRON , DR2TZINC, DR2TCOPP, DR2TSODI, DR2TPOTA, DR2TSELE, DR2TCAFF, DR2TALCO)
+
+colnames(totd2) <- c("rsp_num", "Dietary2 recall status", "Number of days of intake2", "Intake day of the week2", "Energy2", "Protein2","Carbs2","TotSugar2", "fiber2", "Tot_fat2","Sat_fat2","mfat2","pfat2","chol2","vitE1_2","vitE2_2","vitA2", "beta_carotene2","vitB1_2","vitB2_2","niacin_2","vitB6_2",  "folic_acid2","vitBb12_1_2", "vitB12_2_2", "vitC2", "vitD2", "vitK2", "calcium2", "phosphorous2",  "magnesium2", "iron2", "zinc2", "copper2", "sodium2", "potassium2", "selenium2", "caffeine2", "alcohol2")
+
+#combine vite E1 + vitE2
+totd2$vitE_2 <- totd2$vitE1_2 +totd2$vitE2_2
+
+#combine vitB12
+
+totd2$B12_2 <- totd2$vitBb12_1_2 + totd2$vitB12_2_2
+
+#delete original columns
+totd2 <- select(totd2,-c(vitE1_2,vitE2_2, vitBb12_1_2, vitB12_2_2))
+head(totd2)
+
+#merge 1 and 2 by foods for averages of 2 days
+totd_foods <- (select(totd1, Energy: alcohol) + select(totd2, Energy2: alcohol2))/2
+totd_foods
+
+#create final dietary data
+totd <- merge(totd1,totd2, by = "rsp_num")
+totd <- select(totd,"rsp_num":"Intake day of the week", "Dietary2 recall status":"Intake day of the week2")
+totd <- cbind(totd,totd_foods)
+
+totd
+#set . to NA in dietary data
+totd[totd == "."] <- NA
+
+head(totd)
+#add two days together
+
+```
+
+
+
+
+```{r diet values round 2}
+#Demographics + names wanted
+demo <- read.xport("Downloads/NHANES/DataFiles/Frailty/DEMO_H.xpt")
+demo <- select(demo, SEQN, SDDSRVYR, RIAGENDR, RIDAGEYR, RIDRETH3, DMDEDUC2, RIDEXPRG, WTINT2YR, WTMEC2YR, SDMVPSU, SDMVSTRA, INDFMPIR)
+colnames(demo) <- c("rsp_num", "data_cycle", "gender", "age", "race", "education", "pregnant", "int_weight", "mec_weight", "msk_var_psu", "msk_var_strat", "incpov_ratio" )
+
+
+##smoking status
+smok <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/SMQ_H.xpt")
+smok <- smok[,c(1,4)]
+colnames(smok) <- c("rsp_num", "curr_smok")
+smok <- mutate(smok, smoker = case_when(curr_smok == "1" | curr_smok == "2" ~ 1, TRUE ~ 0)) 
+demo <- merge(smok[,c(1,3)], demo, by = "rsp_num")
+
+##Smell and taste questionnaire time
+stq <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/CSQ_H.xpt")
+stq <- select(stq, SEQN, CSQ010, CSQ020, CSQ040, CSQ080, CSQ100, CSQ110, CSQ200, CSQ202, CSQ204, CSQ240, CSQ250, CSQ260)
+colnames(stq) <- c("rsp_num", "prb_sm12", "ch_sm25", "phant_odor", "prb_ts12", "ch_ts_flv", "pers_ts12", "pers_cld_flu12", "pers_drym", "freq_nas_cong", "head_inj", "face_inj", "sin_inf")
+stq <- mutate(stq, sr_od = case_when(prb_sm12 == "1" | ch_sm25 == "2" | phant_odor == "1" ~ 1, TRUE ~ 0)) 
+stq <- mutate(stq, sr_gd = case_when(prb_ts12 == "1" | ch_ts_flv == "2" | pers_ts12 == "1" ~ 1, TRUE ~ 0))
+comb <- merge(stq, demo, by = "rsp_num")
+
+#removing all pregnant subjects
+comb$pregnant <- replace_na(comb$pregnant, 5)
+comb$pregnant[comb$pregnant == "1"] <- 9 ; comb$pregnant[comb$pregnant == "3"] <- 9
+comb <- filter(comb, pregnant != 9)
+comb$pregnant[comb$pregnant == "5"] <- NA 
+
+#age
+comb$ageNum <- comb$age
+comb$age[comb$age >= 40 & comb$age < 50 ] <- 1 ; comb$age[comb$age >= 50 & comb$age < 60 ] <- 2 
+comb$age[comb$age >= 60 & comb$age < 70 ] <- 3 ; comb$age[comb$age >= 70 & comb$age < 80 ] <- 4
+comb$age[comb$age >= 80 ] <- 5
+```
+
+
+```{r diet values round 23}
+#further cleaning
+
+comb$prb_sm12[comb$prb_sm12 == "9"] <- NA 
+comb$prb_sm12[comb$prb_sm12 == "1"] <- 1 ; comb$prb_sm12[comb$prb_sm12 == "2"] <- 0   
+comb$ch_sm25[comb$ch_sm25 == "9"] <- NA 
+comb$ch_sm25[comb$ch_sm25 == "1"] <- 0 ; comb$ch_sm25[comb$ch_sm25 == "2"] <- 1  ; comb$ch_sm25[comb$ch_sm25 == "3"] <- 0
+comb$phant_odor[comb$phant_odor == "9"] <- NA 
+comb$phant_odor[comb$phant_odor == "1"] <- 1 ; comb$phant_odor[comb$phant_odor == "2"] <- 0  
+comb$prb_ts12[comb$prb_ts12 == "9"] <- NA 
+comb$prb_ts12[comb$prb_ts12 == "1"] <- 1 ; comb$prb_ts12[comb$prb_ts12 == "2"] <- 0  
+comb$ch_ts_flv[comb$ch_ts_flv == "9"] <- NA 
+comb$ch_ts_flv <- case_when(comb$ch_ts_flv == "2" ~ 1, comb$ch_ts_flv == "1" ~ 0)
+comb$pers_ts12[comb$pers_ts12 == "9"] <- NA 
+comb$pers_ts12[comb$pers_ts12 == "1"] <- 1 ; comb$pers_ts12[comb$pers_ts12 == "2"] <- 0  
+comb$pers_cld_flu12[comb$pers_cld_flu12 == "9"] <- NA 
+comb$pers_cld_flu12[comb$pers_cld_flu12 == "1"] <- 1 ; comb$pers_cld_flu12[comb$pers_cld_flu12 == "2"] <- 0  
+comb$pers_drym[comb$pers_drym == "9"] <- NA 
+comb$pers_drym[comb$pers_drym == "1"] <- 1 ; comb$pers_drym[comb$pers_drym == "2"] <- 0  
+comb$freq_nas_cong[comb$freq_nas_cong == "9"] <- NA 
+comb$freq_nas_cong[comb$freq_nas_cong == "1"] <- 1 ; comb$freq_nas_cong[comb$freq_nas_cong == "2"] <- 0  
+comb$head_inj[comb$head_inj == "9"] <- NA 
+comb$head_inj[comb$head_inj == "1"] <- 1 ; comb$head_inj[comb$head_inj == "2"] <- 0  
+comb$face_inj[comb$face_inj == "9"] <- NA 
+comb$face_inj[comb$face_inj == "1"] <- 1 ; comb$face_inj[comb$face_inj == "2"] <- 0  
+comb$sin_inf[comb$sin_inf == "9"] <- NA 
+comb$sin_inf[comb$sin_inf == "1"] <- 1 ; comb$sin_inf[comb$sin_inf == "2"] <- 0  
+comb$education[comb$education == "9"] <- NA 
+
+ste <- read.xport("Downloads/NHANES/DataFiles/Frailty/CSX_H.xpt")
+stenames <- c("rsp_num","tse_status", "tse_comcode", "quin_allg", "preg_breast", "sneeze", "discol_mucus", "nasal_block", "sinus_pain", "runny_nose", "none_above", "type_nblock", "lowint_light", "highint_light", "med_light", "low_light", "high_light", "tt1_quin", "tt1_quin_taste", "tt1_1nacl", "tt1_1nacl_taste", "wmt_quin", "wmt_quin_taste", "wmt_1nacl", "wmt_1nacl_taste", "wmt_32nacl", "wmt_32nacl_taste", "wmt_seq", "sm_choc", "sm_straw", "sm_smonk", "sm_leath", "sm_soap", "sm_grape", "sm_onion", "sm_natgas", "wmr_1nacl", "wmr_1nacl_taste", "wmr_32nacl", "wmr_32nacl_taste", "understand")
+colnames(ste) <- stenames
+ste <- filter(ste, tse_status != "3")
+sm_tru <- cbind(ste$sm_choc == "2",   ste$sm_straw == "1",   ste$sm_smonk == "3",   ste$sm_leath == "3",   ste$sm_soap == "1",   ste$sm_grape == "2",   ste$sm_onion == "3",   ste$sm_natgas == "4"  )
+sm_tru <- mutate(as.data.frame(sm_tru), corr_sm = rowSums(sm_tru))
+#objective smell/taste impairment by rasmussen 2018
+ste <- mutate(ste, obj_od = case_when(sm_tru$corr_sm <= 5 & !is.na(ste$sm_soap) ~ 1, TRUE ~ 0))
+#gustatory dysfunction - 1mM quinine from Mattos/Churnin et al. 2019
+ste <- mutate(ste, obj_gd_quin = case_when(ste$wmt_quin_taste == "2" ~ 0, ste$wmt_quin_taste == "1" | ste$wmt_quin_taste == "3" | ste$wmt_quin_taste == "4" | ste$wmt_quin_taste == "5" ~ 1)) 
+#gustatory dysfunction - .32M NaCl
+ste <- mutate(ste, obj_gd_32nacl = case_when(ste$wmt_32nacl_taste == "1" ~ 0, ste$wmt_32nacl_taste == "2" | ste$wmt_32nacl_taste == "3" | ste$wmt_32nacl_taste == "4" | ste$wmt_32nacl_taste == "5" ~ 1)) 
+#gustatory dysfunction = 1 M NaCl
+ste <- mutate(ste, obj_gd_1nacl = case_when(ste$wmt_1nacl_taste == "1" ~ 0, ste$wmt_1nacl_taste == "2" | ste$wmt_1nacl_taste == "3" | ste$wmt_1nacl_taste == "4" | ste$wmt_1nacl_taste == "5" ~ 1)) 
+
+ste <- select(ste, rsp_num, obj_od, obj_gd_quin, obj_gd_32nacl, obj_gd_1nacl)
+
+comb <- merge(comb, ste, by = "rsp_num")
+
+comb <- mutate(comb, obj_gd = case_when(obj_gd_quin == "1" | obj_gd_32nacl == "1" | obj_gd_1nacl == "1" ~ 1, obj_gd_quin == "0" & obj_gd_32nacl == "0" & obj_gd_1nacl == "0" ~ 0))
+
+
+
+
+```
+
+
+```{r FI}
+###Building frailty index
+mcon1314 <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/MCQ_H.xpt")
+mcon1314 <- select(mcon1314, SEQN, MCQ160F, MCQ160M,  MCQ220, MCQ160E, MCQ160C, MCQ160D, MCQ160A)
+colnames(mcon1314) <- c("rsp_num", "stroke", "thyr_ever", "cancer", "hrt_atck", "cor_hrt_dis", "angina", "arthritis")
+dis1314 <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/DLQ_H.xpt")
+dis1314 <- select(dis1314, SEQN, DLQ020)
+colnames(dis1314) <- c("rsp_num", "seeing") 
+mcon <- merge(dis1314, mcon1314, by = "rsp_num")
+
+diab <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/DIQ_H.xpt")
+diab <- select(diab, SEQN, DIQ010)
+colnames(diab) <- c("rsp_num", "diabetes")
+
+
+kid <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/KIQ_U_H.xpt")
+kid <- select(kid, SEQN, KIQ022, KIQ042, KIQ044, KIQ046)
+colnames(kid) <- c("rsp_num", "weak_fail_kid", "leak_phys", "leak_reach", "leak_nonphys")
+kid <- mutate(kid, leak = case_when( leak_reach == "1" | leak_nonphys == "1" ~ 1, leak_reach == "2" & leak_nonphys == "2" ~ 2))
+kid <- select(kid, rsp_num, weak_fail_kid, leak)
+
+pfunc <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/PFQ_H.xpt")
+pfunc <- select(pfunc, SEQN, PFQ061K, PFQ061L, PFQ061J, PFQ061I, PFQ061A, PFQ061G, PFQ061M, PFQ061D, PFQ061P, PFQ061E, PFQ061T, PFQ061R, PFQ057)
+colnames(pfunc) <- c("rsp_num", "diff_fork", "diff_dress", "diff_bed", "diff_chair", "diff_money", "diff_meals", "diff_standing", "diff_stoop", "diff_grasp", "diff_lift", "diff_pushp", "diff_social", "diff_rememb")
+
+bp <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/BPX_H.xpt")
+bp <- select(bp, SEQN, BPXPLS, BPXSY1, BPXSY2, BPXSY3)
+colnames(bp) <- c("rsp_num", "rest_hr", "sys_bp1", "sys_bp2", "sys_bp3")
+bp <- mutate(bp, sys_bp = rowMeans(bp[,3:5]))
+bp <- select(bp, rsp_num, rest_hr, sys_bp)
+
+aud <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/DLQ_H.xpt")
+aud <- select(aud, SEQN, DLQ010)
+colnames(aud) <- c("rsp_num", "diff_hear")
+
+fol <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/FOLFMS_H.xpt")
+fol <- select(fol, SEQN, LBDFOT)
+colnames(fol) <- c("rsp_num", "folate")
+
+ghb <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/GHB_H.xpt") 
+ghb <- select(ghb, SEQN, LBXGH)
+colnames(ghb) <- c("rsp_num", "hba1c")
+
+cblood <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/CBC_H.xpt") 
+cblood <- select(cblood, SEQN, LBXRBCSI, LBXHGB, LBXRDW, LBXLYPCT, LBXNEPCT)
+colnames(cblood) <- c("rsp_num", "rbc_count", "hb", "RDW", "lymphocyte", "seg_neut")
+
+meds <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/RXQ_RX_H.xpt")
+meds <- select(meds, SEQN, RXDCOUNT, RXDUSE)
+meds <- distinct(meds) ##SEQN isnt a unique identifier for this dataset
+meds <- mutate(meds, medication = case_when(RXDUSE == "2" ~ 0, RXDCOUNT == "1" ~ 1, RXDCOUNT == "2" ~ 2, RXDCOUNT == "3" ~ 3, RXDCOUNT == "4" ~ 4, RXDCOUNT == "5" ~ 5, RXDCOUNT == "6" ~ 6, RXDCOUNT == "7" ~ 7, RXDCOUNT == "8" ~ 8, RXDCOUNT == "9" ~ 9, RXDCOUNT == "10" ~ 10, RXDCOUNT == "11" ~ 11, RXDCOUNT == "12" ~ 12, RXDCOUNT == "13" ~ 13, RXDCOUNT == "14" ~ 14, RXDCOUNT == "15" ~ 15, RXDCOUNT == "16" ~ 16, RXDCOUNT == "17" ~ 17, RXDCOUNT == "18" ~ 18, RXDCOUNT == "19" ~ 19, RXDCOUNT == "20" ~ 20, RXDCOUNT == "23" ~ 23 ))
+meds <- select(meds, SEQN, medication)
+colnames(meds) <- c("rsp_num", "medication")
+meds$medication <- case_when(meds$medication < 5 ~ 0, meds$medication >= 5 ~ 1) #Vicinanza 2018 defines polypharmacy as 5 or more medications
+
+care <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/HUQ_H.xpt")
+care <- select(care, SEQN, HUQ010, HUQ020, HUQ071)
+colnames(care) <- c("rsp_num", "sr_health", "year_health", "overnight_stays")
+
+osteo <- read.xport("/Users/VarunVohra/Downloads/NHANES/DataFiles/Frailty/OSQ_H.xpt")
+osteo <- select(osteo, SEQN, OSQ060)
+colnames(osteo) <- c("rsp_num", "ost_brittle")
+
+```
+
+
+```{r}
+##big fat nested merge
+index <- merge(merge(merge(merge(merge(merge(merge(merge(merge(merge(merge(mcon, diab, by = "rsp_num"), kid, by = "rsp_num"), pfunc, by = "rsp_num"), bp, by = "rsp_num"), aud, by = "rsp_num"), fol, by = "rsp_num"), ghb, by = "rsp_num"), cblood, by = "rsp_num"), care, by = "rsp_num"), meds, by = "rsp_num"), osteo, by = "rsp_num")
+```
+
+
+```{r}
+#adding gender for gender-dependent labs
+boo <- select(comb, rsp_num, gender, data_cycle)
+index <- merge(boo, index, by = "rsp_num")
+
+#replacing "idk" and "refused" answers with NA
+index$stroke[index$stroke == "9"] <- NA 
+index$thyr_ever[index$thyr_ever == "9"] <- NA 
+index$cancer[index$cancer == "9"] <- NA 
+index$hrt_atck[index$hrt_atck == "9"] <- NA 
+index$cor_hrt_dis[index$cor_hrt_dis == "9" | index$cor_hrt_dis == "7"] <- NA
+index$angina[index$angina== "9"] <- NA 
+index$arthritis[index$arthritis == "9"] <- NA 
+index$seeing[index$seeing == "9"] <- NA 
+index$diabetes[index$diabetes == "9"] <- NA  ## 3 = "borderline" to ever dr told have diabetes??
+index$weak_fail_kid[index$weak_fail_kid == "9"] <- NA 
+index$diff_fork[index$diff_fork == "9" | index$diff_fork == "5"] <- NA 
+index$diff_dress[index$diff_dress == "9" | index$diff_dress == "5"] <- NA 
+index$diff_bed[index$diff_bed == "9" | index$diff_bed == "5"] <- NA 
+index$diff_chair[index$diff_chair == "9" | index$diff_chair == "5"] <- NA 
+index$diff_money[index$diff_money == "9" | index$diff_money == "5"] <- NA 
+index$diff_meals[index$diff_meals == "9" | index$diff_meals == "5"] <- NA 
+index$diff_standing[index$diff_standing == "9" | index$diff_standing == "5"] <- NA
+index$diff_stoop[index$diff_stoop == "9" | index$diff_stoop == "5"] <- NA 
+index$diff_grasp[index$diff_grasp == "9" | index$diff_grasp == "5"] <- NA 
+index$diff_lift[index$diff_lift == "9" | index$diff_lift == "5"] <- NA 
+index$diff_pushp[index$diff_pushp == "7" | index$diff_pushp == "9" | index$diff_pushp == "5"] <- NA
+index$diff_social[index$diff_social == "7" | index$diff_social == "5"] <- NA 
+index$diff_rememb[index$diff_rememb == "9"] <- NA 
+index$diff_hear[index$diff_hear == "7" | index$diff_hear == "9"] <- NA
+index$seeing[index$seeing == "7" | index$seeing == "9"] <- NA
+index$sr_health[index$sr_health == "7" | index$sr_health == "9"] <- NA
+index$year_health[index$year_health == "9"] <- NA 
+index$overnight_stays[index$overnight_stays == "7" | index$overnight_stays == "9"] <- NA 
+index$ost_brittle[index$ost_brittle == "9"] <- NA 
+
+
+##Recoding variables
+index$stroke[index$stroke == "1"] <- 1 ; index$stroke[index$stroke == "2"] <- 0   
+index$thyr_ever[index$thyr_ever == "1"] <- 1 ; index$thyr_ever[index$thyr_ever == "2"] <- 0   
+index$cancer[index$cancer == "1"] <- 1 ; index$cancer[index$cancer == "2"] <- 0   
+index$hrt_atck[index$hrt_atck == "1"] <- 1 ; index$hrt_atck[index$hrt_atck == "2"] <- 0   
+index$cor_hrt_dis[index$cor_hrt_dis == "1"] <- 1 ; index$cor_hrt_dis[index$cor_hrt_dis == "2"] <- 0   
+index$angina[index$angina == "1"] <- 1 ; index$angina[index$angina == "2"] <- 0   
+index$arthritis[index$arthritis == "1"] <- 1 ; index$arthritis[index$arthritis == "2"] <- 0   
+index$seeing[index$seeing == "1"] <- 1 ; index$seeing[index$seeing == "2"] <- 0   
+index$weak_fail_kid[index$weak_fail_kid == "1"] <- 1 ; index$weak_fail_kid[index$weak_fail_kid == "2"] <- 0   
+index$leak[index$leak == "1"] <- 1 ; index$leak[index$leak == "2"] <- 0   
+index$diff_rememb[index$diff_rememb == "1"] <- 1 ; index$diff_rememb[index$diff_rememb == "2"] <- 0   
+index$diff_hear[index$diff_hear == "1"] <- 1 ; index$diff_hear[index$diff_hear == "2"] <- 0
+index$ost_brittle[index$ost_brittle == "1"] <- 1 ; index$ost_brittle[index$ost_brittle == "2"] <- 0  
+
+index$diabetes <-  case_when(index$diabetes == "1" ~ 1, index$diabetes == "2" ~ 0, index$diabetes == "3" ~ 0.5)
+index$diff_fork <- with(index, case_when(diff_fork == "1" ~ 0, diff_fork == "2" ~ 0.5, diff_fork == "3" ~ 0.75, diff_fork == "4" ~ 1))
+index$diff_dress <- with(index, case_when(diff_dress == "1" ~ 0, diff_dress == "2" ~ 0.5, diff_dress == "3" ~ 0.75, diff_dress == "4" ~ 1))
+index$diff_bed <- with(index, case_when(diff_bed == "1" ~ 0, diff_bed == "2" ~ 0.5, diff_bed == "3" ~ 0.75, diff_bed == "4" ~ 1))
+index$diff_chair <- with(index, case_when(diff_chair == "1" ~ 0, diff_chair == "2" ~ 0.5, diff_chair == "3" ~ 0.75, diff_chair == "4" ~ 1))
+index$diff_money <- with(index, case_when(diff_money == "1" ~ 0, diff_money == "2" ~ 0.5, diff_money == "3" ~ 0.75, diff_money == "4" ~ 1))
+index$diff_meals <- with(index, case_when(diff_meals == "1" ~ 0, diff_meals == "2" ~ 0.5, diff_meals == "3" ~ 0.75, diff_meals == "4" ~ 1))
+index$diff_standing <- with(index, case_when(diff_standing == "1" ~ 0, diff_standing == "2" ~ 0.5, diff_standing == "3" ~ 0.75, diff_standing == "4" ~ 1))
+index$diff_stoop <- with(index, case_when(diff_stoop == "1" ~ 0, diff_stoop == "2" ~ 0.5, diff_stoop == "3" ~ 0.75, diff_stoop == "4" ~ 1))
+index$diff_grasp <- with(index, case_when(diff_grasp == "1" ~ 0, diff_grasp == "2" ~ 0.5, diff_grasp == "3" ~ 0.75, diff_grasp == "4" ~ 1))
+index$diff_lift <- with(index, case_when(diff_lift == "1" ~ 0, diff_lift == "2" ~ 0.5, diff_lift == "3" ~ 0.75, diff_lift == "4" ~ 1))
+index$diff_pushp <- with(index, case_when(diff_pushp == "1" ~ 0, diff_pushp == "2" ~ 0.5, diff_pushp == "3" ~ 0.75, diff_pushp == "4" ~ 1))
+index$diff_social <- with(index, case_when(diff_social == "1" ~ 0, diff_social == "2" ~ 0.5, diff_social == "3" ~ 0.75, diff_social == "4" ~ 1))
+index$sr_health <- with(index, case_when(sr_health == "1" ~ 0, sr_health == "2" ~ 0, sr_health == "3" ~ 0, sr_health == "4" ~ 0.5, sr_health == "5" ~ 1))
+
+index$year_health <- with(index, case_when(year_health == "1" ~ 0, year_health == "3" ~ 0, year_health == "2" ~ 1))
+index$overnight_stays <- with(index, case_when(overnight_stays == "1" ~ 1, overnight_stays == "3" ~ 0, overnight_stays == "2" ~ 0))
+
+
+
+
+
+```
+
+```{r}
+
+## using Hopkins labs test reference ranges for "healthy" lab ranges
+index$rest_hr <- with(index, case_when(rest_hr < 60 | rest_hr > 100 ~ 1, TRUE ~ 0))
+index$sys_bp <- with(index, case_when(sys_bp > 140 ~ 1, TRUE ~ 0))
+index$folate <- with(index, case_when(folate > 7.2 ~ 0, TRUE ~ 1))
+index$hba1c <- with(index, case_when(hba1c < 5.7 ~ 0, TRUE ~ 1))
+index$rbc_count <- with(index, case_when(gender == "1" & rbc_count >= 4.5 & rbc_count <= 5.9 ~ 0, gender == "2" & rbc_count >= 4.0 & rbc_count <= 5.2 ~ 0, TRUE ~ 1 ))
+index$hb <-  with (index, case_when(gender == "1" & hb >= 13.9 & hb <= 16.3 ~ 0, gender == "2" & hb >= 12.0 & hb <= 15.0 ~ 0, TRUE ~ 1 ))
+index$RDW <-  with (index, case_when(RDW >= 11.5 & RDW <= 14.5 ~ 0, TRUE ~ 1))
+index$lymphocyte <-  with (index, case_when(lymphocyte >= 24 & lymphocyte <= 44 ~ 0, TRUE ~ 1))
+index$seg_neut <-  with (index, case_when(seg_neut >= 40 & seg_neut <= 70 ~ 0, TRUE ~ 1))
+
+
+comb$gender[comb$gender == "1"] <- 0;comb$gender[comb$gender == "2"] <- 1
+```
+
+
+```{r}
+#for missing variables, index is coded over denominator of total nonmissing values 
+index
+troo <- select(index, 4:42)
+troo
+troo <- !sapply(troo, is.na)
+troo <- mutate(as.data.frame(troo), notna = rowSums(troo))
+index <- mutate(index, fraildex = (rowSums(index[,c(4:42)], na.rm = T))/troo$notna)
+index <- mutate(index, missing = (rowSums(is.na(index[,c(4:42)]))/39) * 100)
+
+```
+
+
+```{r}
+comb <- merge(index[,c(1,43,44)], comb, by = "rsp_num")
+comb <- mutate(comb, fraildex_cat = case_when(fraildex <= 0.1 ~ 1, fraildex > 0.1 & fraildex <= 0.21 ~ 2, fraildex > 0.21 & fraildex <= 0.45 ~ 3, fraildex > 0.45 ~ 4)) 
+comb$fraildex_cat <- factor(comb$fraildex_cat)
+#1 = "nonfrail", 2 = vulnerable, 3 = frail, 4 = most frail; Blodgett et al. 2014; Hoover, Rotermann, Sanmartin, & Bernier, 2013
+
+
+
+#add diet
+comb <- merge(totd,comb,by = "rsp_num")
+
+bmi <- read.xport("Downloads/NHANES/DataFiles/Frailty/BMX_H.xpt")
+head(bmi)
+bmi <- select(bmi, SEQN, BMXBMI)
+colnames(bmi) <- c("rsp_num","bmi")
+comb <- merge(comb,bmi,by = "rsp_num")
+
+
+#change comb to diet
+diet <- comb
+
+
+
+
+
+#filter out those with diet on both days
+diet <- diet[diet$`Dietary2 recall status` == 1, ]
+
+```
+
+```{r Energy Adjustment}
+ener <- select(diet, Energy:alcohol)
+
+
+
+
+#for (i in c(2:31)){
+#  mdl <- lm(ener[,i] ~ Energy, data = diet)
+#  resid[,i] <- residuals(mdl)
+#}
+
+
+
+prot <- lm(Protein ~ Energy, data = diet)
+residuals(prot)
+summary(prot)
+
+resid
+
+```
+
+```{r}
+error.dots(select(diet, Protein:alcohol))
+```
+
+
+
+```{r Correlation Test}
+
+datamatrix <- cor(select(diet, Protein:alcohol))
+
+corrplot(datamatrix, method="number")
+
+```
+
+
+```{r Kaiser-Myer-Olkin}
+#KMO ≥ 60 = factorable
+X <- select(diet, Protein:alcohol)
+KMO(r=cor(X))
+select(diet, Protein:alcohol)
+
+m <- mean(X$Protein)
+sd <- sd(X$Protein)
+
+
+
+```
+
+
+```{r Bartlett’s Test of Sphericity}
+#Small values (8.84e-290 < 0.05) of the significance level indicate that a factor analysis may be useful with our data.
+cortest.bartlett(X)
+
+```
+
+```{r Determinant}
+#should be positive
+det(cor(X))
+
+```
+
+
+
+
+
+```{r Scree Pilot}
+
+fafitfree <- fa(X,nfactors = ncol(X), rotate = "none")
+n_factors <- length(fafitfree$e.values)
+
+scree <- data.frame(
+  Factor_n =  as.factor(1:n_factors), 
+  Eigenvalue = fafitfree$e.values)
+
+
+ggplot(scree, aes(x = Factor_n, y = Eigenvalue, group = 1)) + 
+  geom_point() + geom_line() +
+  xlab("Number of factors") +
+  ylab("Initial eigenvalue") +
+  labs( title = "Scree Plot", 
+        subtitle = "(Based on the unreduced correlation matrix)")
+
+```
+
+
+```{r Parallel Analysis}
+#parallel <- fa.parallel(X)
+#parallel$values
+```
+
+
+```{r Number of factors}
+nScree(X)
+```
+
+
+```{r Factor analysis using the factanal method}
+dp <- factanal(X, factors=4, scores = c("regression"), rotation = "varimax")
+
+
+
+
+
+dp1 <- dp$scores[,1]
+dp2 <- dp$scores[,2]
+dp3 <- dp$scores[,3]
+dp4 <- dp$scores[,4]
+
+
+
+
+
+```
+
+
+
+```{r}
+#diet[11:41] <- resid
+
+diet$obj_od <- as.factor(diet$obj_od)
+diet$obj_gd <- as.factor(diet$obj_gd)
+diet$obj_gd_quin <- as.factor(diet$obj_gd_quin)
+diet$obj_gd_32nacl <- as.factor(diet$obj_gd_32nacl)
+diet$obj_gd_1nacl <- as.factor(diet$obj_gd_1nacl)
+
+diet$age <- as.factor(diet$age)
+diet$ageNum <- as.numeric(diet$ageNum)
+diet$gender <- as.factor(diet$gender)
+diet$incpov_ratio <- as.numeric(diet$incpov_ratio)
+
+diet$sr_od <- as.factor(diet$sr_od)
+diet$education <- as.factor(diet$education)
+diet$smoker <- as.factor(diet$smoker)
+diet$race <- as.factor(diet$race)
+diet$bmi <- as.factor(diet$bmi)
+
+diet$Energy <- as.numeric(diet$Energy)
+
+diet$fraildex_cat <- as.numeric(diet$fraildex_cat)
+
+#frailty for log models
+diet$frail_log <- diet$fraildex_cat
+diet$frail_log[diet$frail_log == 1 | diet$frail_log == 2] <- 0
+diet$frail_log[diet$frail_log == 3 | diet$frail_log == 4] <- 1
+
+diet$frail_log <- as.factor(diet$frail_log)
+diet$fraildex_cat <- as.factor(diet$fraildex_cat)
+
+diet$fraildex <- as.numeric(diet$fraildex)
+
+
+svymdl$loadings
+
+summary(diet$frail_log)
+summary(diet$fraildex_cat)
+```
+
+
+```{r Survery design}
+diet_sur <- svydesign(id = ~msk_var_psu, strata = ~msk_var_strat, weights = ~D2Weight, nest = TRUE, data = diet)
+
+```
+
+
+
+
+
+```{r}
+svymdl <- svyfactanal(~Protein+Carbs+ TotSugar + fiber + Tot_fat + Sat_fat + mfat+pfat+chol+vitA+beta_carotene+vitB1 + vitB2 + niacin + vitB6 + folic_acid + vitC + vitD + vitK + calcium + phosphorous + magnesium + iron + zinc + copper + sodium + potassium + selenium + caffeine + alcohol, diet_sur, factors = 4)
+
+
+#svpca <- svyprcomp(~Protein+Carbs+ TotSugar + fiber + Tot_fat + Sat_fat + mfat+pfat+chol+vitA+beta_carotene+vitB1 + vitB2 + niacin + vitB6 + folic_acid + vitC + vitD + vitK + calcium + phosphorous + magnesium + iron + zinc + copper + sodium + potassium + selenium + caffeine + alcohol, diet_sur, center = TRUE, scale = TRUE, scores = TRUE, nfactors = 4)
+
+
+svymdl
+
+svyloadings <- as.data.frame(unclass(svymdl$loadings))
+svyloadings
+
+X <- scale(X, scale = TRUE)
+X <- as.matrix(X)
+svyloadings <- as.matrix(svyloadings)
+svyscores <- (X %*% solve(cor(X)) %*% svyloadings)
+
+
+
+svdp1 <- svyscores[,1];svdp2 <- svyscores[,2];svdp3 <- svyscores[,3];svdp4 <- svyscores[,4]
+#svdp5 <- svyscores[,5];svdp6 <- svyscores[,6];svdp7 <- svyscores[,7]
+
+
+diet$svdp1 <- as.numeric(svdp1)
+diet$svdp1
+diet$svdp2<- as.numeric(svdp2)
+diet$svdp3 <- as.numeric(svdp3)
+diet$svdp4 <- as.numeric(svdp4)
+
+
+```
+
+
+```{r Survery design 3}
+
+colSums(is.na(diet))
+
+diet_sur <- svydesign(id = ~msk_var_psu, strata = ~msk_var_strat, weights = ~int_weight, nest = TRUE, data = diet)
+
+dsub1 <- subset(diet_sur,(diet$age == 3 |diet$age == 4|diet$age == 5))
+
+dsubA <- subset(diet_sur,(diet$ageNum>= 60))
+
+
+
+
+diet$high_fat_dp <- as.numeric(diet$svdp2)
+
+diet$quantile <- as.factor((quantile = ntile(diet$high_fat_dp, 4)))
+#levels(diet$quantile) <- c("greatest risk", "2nd quant", "3rd quant", "4th quant", "5th quant")
+levels(diet$quantile) <- c("greatest risk", "2nd quant", "3rd quant", "least risk")
+
+#diet$quantile <- relevel(diet$quantile, ref = "4th quant")
+
+#diet <- within(diet, quantile <- relevel(quantile, ref = "least risk" ))
+
+diet_sur <- svydesign(id = ~msk_var_psu, strata = ~msk_var_strat, weights = ~int_weight, nest = TRUE, data = diet)
+
+dsub1 <- subset(diet_sur,(diet$age == 3 |diet$age == 4|diet$age == 5))
+
+
+
+
+
+newfit <- (svyglm(obj_od ~ quantile + gender + race  , design = dsub1, family = "quasibinomial"))
+
+
+newfit.summary <- summary(newfit)
+
+newfit.summary 
+
+cbind(exp(confint(newfit)),exp(coefficients(newfit)),newfit.summary$coefficients[,4])
+
+
+```
+
+
+```{r Survery design2}
+df = data.frame()
+
+
+for (i in c(1:10)){
+  
+q1 <- filter(diet, diet$quantile == i)
+df[i,2] <- summary(q1$obj_od)[2]/(summary(q1$obj_od)[1] + summary(q1$obj_od)[2])
+
+}
+
+df[1:10,1] <- c(1:10)
+df
+
+model.linear <- lm(df[,1]~df[,2])
+model.squared <- lm(df[,1]~poly(df[,2],2))
+anova(model.linear,model.squared)
+
+summary(model.linear)
+```
+
+
+```{r Age-stratified old, survey weighted factanal logistic regressions obj_od}
+
+
+    
+    fit1 <- (svyglm(obj_od ~ svdp1 + gender  + Energy + incpov_ratio + smoker + race + bmi, design = dsub1, family = "quasibinomial"))
+    g1 <- glm_table_maker(fit1, 13)[1,]
+    
+    fit2 <- (svyglm(obj_od ~ svdp2 + gender + Energy + incpov_ratio + smoker + race , design = dsub1, family = "quasibinomial"))
+      g2 <- glm_table_maker(fit2, 13)[1,]
+    
+    fit3 <- (svyglm(obj_od ~ svdp3 + gender + Energy + incpov_ratio + smoker + race + bmi, design = dsub1, family = "quasibinomial"))
+    g3 <- glm_table_maker(fit3, 13)[1,]
+    
+    fit3 <- (svyglm(obj_od ~ svdp4 + gender+ Energy  + incpov_ratio + smoker + race + bmi, design = dsub1, family = "quasibinomial"))
+    g4 <- glm_table_maker(fit3, 13)[1,]
+    
+
+    
+  #resultsOD <- rbind(resultsOD,dsg_names[[i]],glm_table_maker(fit1, 13)[1,],glm_table_maker(fit2, 13)[1,],glm_table_maker(fit3, 13)[1,],glm_table_maker(fit4, 13)[1,])
+
+resultsOD <- rbind(g1,g2,g3,g4)
+
+
+resultsOD
+
+select(diet, Protein:alcohol)
+svyloadings
+
+```
+
+
+```{r}
+resultssOD = data.frame()
+
+
+    
+    fit1 <- (svyglm(sr_od ~ svdp1 + gender + Energy+ incpov_ratio + smoker + race + bmi, design = dsub1, family = "quasibinomial"))
+      g1 <- glm_table_maker(fit1, 13)[1,]
+    
+    fit2 <- (svyglm(sr_od ~ svdp2 + gender+ Energy + incpov_ratio + smoker + race + bmi, design = dsub1, family = "quasibinomial"))
+      g2 <- glm_table_maker(fit2, 13)[1,]
+    
+    fit3 <- (svyglm(sr_od ~ svdp3 + gender + Energy + incpov_ratio + smoker + race + bmi, design = dsub1, family = "quasibinomial"))
+      g3 <- glm_table_maker(fit3, 13)[1,]
+    
+    fit4 <- (svyglm(sr_od ~ svdp4 + gender+ Energy + incpov_ratio + smoker + race + bmi, design = dsub1, family = "quasibinomial"))
+      g4 <- glm_table_maker(fit4, 13)[1,]
+    
+
+
+
+
+
+
+resultsOD <- rbind(g1,g2,g3,g4)
+resultsOD
+
+
+```
+
+
+
+```{r Age-stratified survey weighted factanal logistic regressions frailty}
+resultsFr = data.frame()
+
+
+for (i in c(1:length(dsgs))){
+
+    dsg <- dsgs[[i]]
+    
+    fit1 <- (svyglm(fraildex ~ svdp1 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dsg, family = "gaussian"))
+    
+    fit2 <- (svyglm(fraildex ~ svdp2 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dsg, family = "gaussian"))
+    
+    fit3 <- (svyglm(fraildex ~ svdp3 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dsg, family = "gaussian"))
+    
+    fit4 <- (svyglm(fraildex ~ svdp4 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dsg, family = "gaussian"))
+    
+    resultsFr <- rbind(resultsFr,dsg_names[[i]],glm_table_maker(fit1, 13)[1,],glm_table_maker(fit2, 13)[1,],glm_table_maker(fit3, 13)[1,],glm_table_maker(fit4, 13)[1,])
+
+}
+
+resultsFr#dp2 is signficant for older mOD
+```
+
+
+
+
+
+
+
+
+
+```{r Age-stratified GD}
+
+resultsGD = data.frame()
+
+for (i in c(1:length(dsgs))){
+
+    dsg <- dsgs[[i]]
+    
+    fit1 <- (svyglm(obj_gd_32nacl ~ svdp1 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dsg, family = "quasibinomial"))
+    
+    fit2 <- (svyglm(obj_gd_32nacl ~ svdp2 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dsg, family = "quasibinomial"))
+    
+    fit3 <- (svyglm(obj_gd_32nacl ~ svdp3 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dsg, family = "quasibinomial"))
+    
+    fit4 <- (svyglm(obj_gd_32nacl ~ svdp4 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dsg, family = "quasibinomial"))
+    
+    resultsGD <- rbind(resultsGD,dsg_names[[i]],glm_table_maker(fit1, 13)[1,],glm_table_maker(fit2, 13)[1,],glm_table_maker(fit3, 13)[1,],glm_table_maker(fit4, 13)[1,])
+
+}
+
+resultsGD#dp2 is signficant for older mOD
+
+```
+```{r Age-stratified Sleep}
+
+resultsSL = data.frame()
+
+for (i in c(1:length(dsgs))){
+
+    dsg <- dsgs[[i]]
+    
+    fit1 <- (svyglm(sleep ~ svdp1 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dsg, family = "quasibinomial"))
+    
+    fit2 <- (svyglm(sleep ~ svdp2 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dsg, family = "quasibinomial"))
+    
+    fit3 <- (svyglm(sleep ~ svdp3 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dsg, family = "quasibinomial"))
+    
+    fit4 <- (svyglm(sleep ~ svdp4 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dsg, family = "quasibinomial"))
+    
+    resultsSL <- rbind(resultsSL,dsg_names[[i]],glm_table_maker(fit1, 13)[1,],glm_table_maker(fit2, 13)[1,],glm_table_maker(fit3, 13)[1,],glm_table_maker(fit4, 13)[1,])
+
+}
+resultsSL#dp2 is signficant for older mOD
+
+```
+
+
+```{r}
+diet$high_fat_dp <- as.numeric(diet$svdp2)
+
+diet$quantile <- (quantile = ntile(diet$svdp2, 10))
+
+
+dq1 <- subset(diet_sur,(diet$age == 3|diet$age == 4|diet$age == 5) & (diet$quantile == 1))
+dq2 <- subset(diet_sur,(diet$age == 3|diet$age == 4|diet$age == 5) & (diet$quantile == 2))
+dq3 <- subset(diet_sur,(diet$age == 3|diet$age == 4|diet$age == 5) & (diet$quantile == 3))
+dq4 <- subset(diet_sur,(diet$age == 3|diet$age == 4|diet$age == 5) & (diet$quantile == 4))
+dq5 <- subset(diet_sur,(diet$age == 3|diet$age == 4|diet$age == 5) & (diet$quantile == 5))
+dq6 <- subset(diet_sur,(diet$age == 3|diet$age == 4|diet$age == 5) & (diet$quantile == 6))
+dq7 <- subset(diet_sur,(diet$age == 3|diet$age == 4|diet$age == 5) & (diet$quantile == 7))
+dq8 <- subset(diet_sur,(diet$age == 3|diet$age == 4|diet$age == 5) & (diet$quantile == 8))
+dq9 <- subset(diet_sur,(diet$age == 3|diet$age == 4|diet$age == 5) & (diet$quantile == 9))
+dq10 <- subset(diet_sur,(diet$age == 3|diet$age == 4|diet$age == 5) & (diet$quantile == 10))
+
+
+
+
+q1 <- (svyglm(obj_od ~ svdp2 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = diet_sur, family = "quasibinomial", subset = (diet$age == 4|diet$age == 5)))
+
+q2 <- (svyglm(obj_od ~ svdp1 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dq2, family = "quasibinomial"))
+q3 <- (svyglm(obj_od ~ svdp2 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dq3, family = "quasibinomial"))
+q4 <- (svyglm(obj_od ~ svdp2 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dq4, family = "quasibinomial"))
+q5 <- (svyglm(obj_od ~ svdp2 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dq5, family = "quasibinomial"))
+q6 <- (svyglm(obj_od ~ svdp2 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dq6, family = "quasibinomial"))
+q7 <- (svyglm(obj_od ~ svdp2 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dq7, family = "quasibinomial"))
+q8 <- (svyglm(obj_od ~ svdp2 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dq8, family = "quasibinomial"))
+q9 <- (svyglm(obj_od ~ svdp2 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dq9, family = "quasibinomial"))
+q10 <- (svyglm(obj_od ~ svdp2 + gender + incpov_ratio + sr_od + smoker + race + bmi, design = dq10, family = "quasibinomial"))
+
+
+glm_table_maker(q1)
+glm_table_maker(q2)
+glm_table_maker(q3)
+glm_table_maker(q4)
+glm_table_maker(q5)
+glm_table_maker(q6)
+glm_table_maker(q7)
+glm_table_maker(q8)
+glm_table_maker(q9)
+glm_table_maker(q10)
+
+
+
+
+```
+
+
+
+
+```{r}
+#cognition
+
+cog <- read.xport("Downloads/NHANES/DataFiles/Frailty/CFQ_H.xpt")
+cog <- select(cog, SEQN, CFDCST1,CFDCST2,CFDCST3,CFDCCS)
+colnames(cog) <-  c("rsp_num","cerad1", "cerad2", "cerad3","ceradstatus")
+cog <- filter(cog, ceradstatus == 1)
+
+diet_cog <- merge(cog,diet, by = "rsp_num")
+
+diet_cog$cerad <- diet_cog$cerad1 + diet_cog$cerad2 + diet_cog$cerad3
+diet_cog$cerad <- as.numeric(diet_cog$cerad)
+
+diet_cog
+
+#survery object with cognition
+diet_sur_cog <- svydesign(id = ~msk_var_psu, strata = ~msk_var_strat, weights = ~int_weight, nest = TRUE, data = diet_cog)
+dietcog_sub1 <- subset(diet_sur_cog, (diet_cog$sr_od == 0) & diet_cog$education == 5)
+
+
+#fits
+
+cogfit1 <- (svyglm(cerad ~ svdp2  + Energy + obj_od  + gender + incpov_ratio  + smoker + race + bmi, design = diet_sur_cog , family = "gaussian"))
+
+summary(cogfit1)
+
+cogfit2 <- (svyglm(cerad ~ svdp2 + Energy + obj_od  + incpov_ratio  + smoker + race + bmi, design = dietcog_sub1 , family = "gaussian"))
+
+summary(cogfit2)
+
+
+```
+```{r}
+dep <- read.xport("Downloads/NHANES/DataFiles/Frailty/DPQ_H.xpt")
+dep <- select(dep, SEQN,DPQ010,DPQ020,DPQ030,DPQ040,DPQ050,DPQ060,DPQ070,DPQ080,DPQ090,DPQ100)
+
+colnames(dep) <-  c("rsp_num","q1", "q2", "q3","q4","q5","q6","q7","q8","q9","q10")
+dep$score <- rowSums(dep[2:10],na.rm = TRUE)
+
+diet_dep <- merge(dep,diet, by = "rsp_num")
+
+
+diet_dep$score<- as.numeric(diet_dep$score)
+
+
+
+#survery object with cognition
+diet_dep_sur <- svydesign(id = ~msk_var_psu, strata = ~msk_var_strat, weights = ~int_weight, nest = TRUE, data = diet_dep)
+dietcog_sub1 <- subset(diet_sur_cog, (diet_cog$sr_od == 0) & diet_cog$education == 5)
+
+
+#fits
+
+cogfit1 <- (svyglm(score ~ svdp4  + obj_od  + gender + incpov_ratio  + smoker + race + bmi, design = diet_dep_sur, family = "gaussian"))
+
+summary(cogfit1)
+
+cogfit2 <- (svyglm(cerad ~ svdp2 + Energy + obj_od  + incpov_ratio  + smoker + race + bmi, design = dietcog_sub1 , family = "gaussian"))
+
+summary(cogfit2)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
